@@ -1,16 +1,71 @@
-# React + Vite
+# Virtual-Lab
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A collaborative browser-based 2D physics simulation platform for virtual experimentation.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Virtual-Lab is an interactive web-based physics simulation workspace that enables users to create, manipulate, and experiment with physical bodies in a browser environment.
 
-## React Compiler
+The platform is being developed to support:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Real-time physics experimentation
+- Constraint-based mechanical simulation
+- Multi-user collaborative experimentation
+- Persistent experiment storage
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech Stack
+
+### Frontend
+- React
+- Vite
+- Matter.js
+
+### Backend (Upcoming)
+- Node.js
+- Express
+- Socket.io
+
+### Database (Upcoming)
+- MongoDB
+
+---
+
+## Current Features
+
+### Day 1
+- Physics engine integration using Matter.js
+- Gravity-based rigid body simulation
+- Collision detection with static floor
+- React lifecycle debugging and optimization
+
+---
+
+## Roadmap
+
+- [x] Project initialization
+- [x] Physics simulation workspace
+- [ ] Interactive object controls
+- [ ] Constraint system (spring / rope / pivot)
+- [ ] Real-time collaboration
+- [ ] Experiment persistence
+- [ ] Deployment
+
+---
+
+## Learning Goals
+
+This project is focused on learning and demonstrating:
+
+- Physics engine integration
+- Real-time synchronization
+- Frontend architecture
+- Full-stack system design
+- Interactive simulation systems
+
+---
+
+## Current Status
+
+In development
