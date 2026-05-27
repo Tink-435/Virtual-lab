@@ -3,41 +3,59 @@ import Matter from "matter-js";
 
 function App() {
   const sceneRef = useRef(null);
+  const engineRef = useRef(null);
+  const mouseConstraintRef = useRef(null);
 
   useEffect(() => {
-    const Engine = Matter.Engine;
-    const Render = Matter.Render;
-    const Runner = Matter.Runner;
-    const Bodies = Matter.Bodies;
-    const Composite = Matter.Composite;
+    const {
+      Engine,
+      Render,
+      Runner,
+      Bodies,
+      Composite,
+      Mouse,
+      MouseConstraint,
+    } = Matter;
 
     const engine = Engine.create();
+    engine.gravity.y = 0.7;
+    engineRef.current = engine;
 
     const render = Render.create({
       element: sceneRef.current,
-      engine: engine,
+      engine,
       options: {
         width: 1200,
         height: 700,
         wireframes: false,
-        background: "#111827"
-      }
+        background: "#111827",
+      },
     });
 
     const ground = Bodies.rectangle(600, 680, 1200, 40, {
       isStatic: true,
-      render: { fillStyle: "#4B5563" }
+      render: { fillStyle: "#4B5563" },
     });
 
-    const box1 = Bodies.rectangle(400, 200, 80, 80, {
-      render: { fillStyle: "#3B82F6" }
+    Composite.add(engine.world, ground);
+
+    const mouse = Mouse.create(render.canvas);
+
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse,
+      constraint: {
+        stiffness: 0.15,
+        render: {
+          visible: false,
+        },
+      },
     });
 
-    const box2 = Bodies.rectangle(500, 50, 80, 80, {
-      render: { fillStyle: "#10B981" }
-    });
+    mouseConstraintRef.current = mouseConstraint;
 
-    Composite.add(engine.world, [ground, box1, box2]);
+    Composite.add(engine.world, mouseConstraint);
+
+    render.mouse = mouse;
 
     Render.run(render);
 
@@ -47,18 +65,85 @@ function App() {
     return () => {
       Render.stop(render);
       Runner.stop(runner);
+      Matter.World.clear(engine.world);
+      Matter.Engine.clear(engine);
+      render.canvas.remove();
     };
   }, []);
+
+  const createGround = () => {
+    return Matter.Bodies.rectangle(600, 680, 1200, 40, {
+      isStatic: true,
+      render: { fillStyle: "#4B5563" },
+    });
+  };
+
+  const addBox = () => {
+    const box = Matter.Bodies.rectangle(
+      Math.random() * 800 + 100,
+      100,
+      80,
+      80,
+      {
+        render: { fillStyle: "#3B82F6" },
+      }
+    );
+
+    Matter.Composite.add(engineRef.current.world, box);
+  };
+
+  const addCircle = () => {
+    const circle = Matter.Bodies.circle(
+      Math.random() * 800 + 100,
+      100,
+      40,
+      {
+        render: { fillStyle: "#10B981" },
+      }
+    );
+
+    Matter.Composite.add(engineRef.current.world, circle);
+  };
+
+  const resetScene = () => {
+    const world = engineRef.current.world;
+
+    Matter.Composite.clear(world, false);
+
+    Matter.Composite.add(world, [
+      createGround(),
+      mouseConstraintRef.current,
+    ]);
+  };
 
   return (
     <div
       style={{
-        display: "flex",
-        justifyContent: "center",
-        marginTop: "20px"
+        background: "#0F172A",
+        minHeight: "100vh",
+        padding: "20px",
       }}
     >
-      <div ref={sceneRef}></div>
+      <h1 style={{ color: "white", textAlign: "center" }}>
+        Virtual-Lab
+      </h1>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "15px",
+          marginBottom: "20px",
+        }}
+      >
+        <button onClick={addBox}>Add Box</button>
+        <button onClick={addCircle}>Add Circle</button>
+        <button onClick={resetScene}>Reset</button>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div ref={sceneRef}></div>
+      </div>
     </div>
   );
 }
