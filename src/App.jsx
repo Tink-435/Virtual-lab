@@ -121,40 +121,48 @@ function App() {
     });
   };
 
-  const addBox = () => {
-    const box = Matter.Bodies.rectangle(
-      Math.random() * 800 + 100,
-      100,
-      80,
-      80,
-      {
-        density,
-        render: { fillStyle: "#3B82F6" },
-      }
-    );
+ const addBox = () => {
+  const box = Matter.Bodies.rectangle(
+    Math.random() * 800 + 100,
+    100,
+    80,
+    80,
+    {
+      density,
+      render: {
+        fillStyle: "#3B82F6",
+      },
+      label: "box",
+    }
+  );
 
-    Matter.Composite.add(engineRef.current.world, box);
-  };
+  Matter.Composite.add(engineRef.current.world, box);
+};
 
-  const addCircle = () => {
-    const circle = Matter.Bodies.circle(
-      Math.random() * 800 + 100,
-      100,
-      40,
-      {
-        density,
-        render: { fillStyle: "#10B981" },
-      }
-    );
+ const addCircle = () => {
+  const circle = Matter.Bodies.circle(
+    Math.random() * 800 + 100,
+    100,
+    40,
+    {
+      density,
+      render: {
+        fillStyle: "#10B981",
+      },
+      label: "circle",
+    }
+  );
 
-    Matter.Composite.add(engineRef.current.world, circle);
-  };
+  Matter.Composite.add(engineRef.current.world, circle);
+};
+
   const addSpringPair = () => {
   const box = Matter.Bodies.rectangle(650, 250, 80, 80, {
     density,
     render: {
       fillStyle: "#F59E0B",
     },
+    label: "anchoredSpringBox",
   });
 
   const spring = Matter.Constraint.create({
@@ -174,12 +182,14 @@ function App() {
     spring,
   ]);
 };
+
 const addCoupledSpring = () => {
   const boxA = Matter.Bodies.rectangle(450, 250, 80, 80, {
     density,
     render: {
       fillStyle: "#3B82F6",
     },
+    label: "coupledSpringA",
   });
 
   const boxB = Matter.Bodies.rectangle(750, 250, 80, 80, {
@@ -187,6 +197,7 @@ const addCoupledSpring = () => {
     render: {
       fillStyle: "#EF4444",
     },
+    label: "coupledSpringB",
   });
 
   const spring = Matter.Constraint.create({
@@ -219,6 +230,78 @@ const addCoupledSpring = () => {
     ]);
   };
 
+  const saveExperiment = () => {
+  const world = engineRef.current.world;
+
+  const bodies = Matter.Composite.allBodies(world)
+    .filter(
+      (body) =>
+        !body.isStatic &&
+        body.label !== "Mouse Constraint Body"
+    )
+    .map((body) => ({
+      x: body.position.x,
+      y: body.position.y,
+      circleRadius: body.circleRadius || null,
+    }));
+
+  localStorage.setItem(
+    "virtualLabExperiment",
+    JSON.stringify(bodies)
+  );
+
+  alert("Experiment saved!");
+};
+
+const loadExperiment = () => {
+  const saved = localStorage.getItem("virtualLabExperiment");
+
+  if (!saved) {
+    alert("No saved experiment found.");
+    return;
+  }
+
+  resetScene();
+
+  const bodies = JSON.parse(saved);
+
+  bodies.forEach((body) => {
+    if (body.circleRadius) {
+      const circle = Matter.Bodies.circle(
+        body.x,
+        body.y,
+        40,
+        {
+          density,
+          render: { fillStyle: "#10B981" },
+        }
+      );
+
+      Matter.Composite.add(
+        engineRef.current.world,
+        circle
+      );
+    } else {
+      const box = Matter.Bodies.rectangle(
+        body.x,
+        body.y,
+        80,
+        80,
+        {
+          density,
+          render: { fillStyle: "#3B82F6" },
+        }
+      );
+
+      Matter.Composite.add(
+        engineRef.current.world,
+        box
+      );
+    }
+  });
+
+  alert("Experiment loaded!");
+};
   return (
     <div
       style={{
@@ -293,13 +376,15 @@ const addCoupledSpring = () => {
 </div>
 
       <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "15px",
-          marginBottom: "20px",
-        }}
-      >
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "20px",
+    flexWrap: "wrap"
+  }}
+>
+  
         <button onClick={addBox}>Add Box</button>
         <button onClick={addCircle}>Add Circle</button>
         <button onClick={addSpringPair}>Add Anchored Spring</button>
@@ -307,8 +392,11 @@ const addCoupledSpring = () => {
   Add Coupled Spring
 </button>
         <button onClick={resetScene}>Reset</button>
-      </div>
+        <button onClick={saveExperiment}>Save</button>
+      <button onClick={loadExperiment}>Load</button>
 
+      </div>
+      
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div ref={sceneRef}></div>
       </div>
