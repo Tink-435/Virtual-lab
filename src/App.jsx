@@ -8,6 +8,7 @@ function App() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
   const mouseConstraintRef = useRef(null);
+  const previousVelocitiesRef = useRef(new Map());
 
   useEffect(() => {
    const {
@@ -84,18 +85,71 @@ function App() {
     const endY = startY + velocity.y * scale;
 
     context.beginPath();
-    context.moveTo(startX, startY);
-    context.lineTo(endX, endY);
+    context.moveTo(startX-10, startY);
+    context.lineTo(endX-10, endY);
     context.strokeStyle = "#22C55E";
     context.lineWidth = 2;
     context.stroke();
 
     context.beginPath();
-    context.arc(endX, endY, 4, 0, 2 * Math.PI);
+    context.arc(endX - 10, endY, 4, 0, 2 * Math.PI);
     context.fillStyle = "#22C55E";
     context.fill();
+
+   const previous =
+  previousVelocitiesRef.current.get(body.id);
+
+const accelScale = 80;
+
+let accelX = 0;
+let accelY = 0;
+
+if (previous) {
+  const rawAccelX =
+    (velocity.x - previous.vx) * accelScale;
+
+  const rawAccelY =
+    (velocity.y - previous.vy) * accelScale;
+
+  accelX =
+    previous.ax * 0.8 + rawAccelX * 0.2;
+
+  accelY =
+    previous.ay * 0.8 + rawAccelY * 0.2;
+}
+
+previousVelocitiesRef.current.set(body.id, {
+  vx: velocity.x,
+  vy: velocity.y,
+  ax: accelX,
+  ay: accelY,
+});
+
+context.beginPath();
+context.moveTo(startX+10, startY);
+context.lineTo(
+  startX+10 + accelX,
+  startY + accelY
+);
+
+context.strokeStyle = "#EF4444";
+context.lineWidth = 2;
+context.stroke();
+
+context.beginPath();
+context.arc(
+  startX +10 + accelX,
+  startY + accelY,
+  4,
+  0,
+  2 * Math.PI
+);
+
+context.fillStyle = "#EF4444";
+context.fill();
   });
 });
+
 
     const runner = Runner.create();
     Runner.run(runner, engine);
@@ -119,6 +173,7 @@ function App() {
       isStatic: true,
       render: { fillStyle: "#4B5563" },
     });
+    
   };
 
  const addBox = () => {
@@ -373,6 +428,21 @@ const loadExperiment = () => {
       style={{ width: "100%" }}
     />
   </div>
+  <div
+  style={{
+    position: "absolute",
+    left: "20px",
+    top: "420px",
+    width: "260px",
+    background: "#1E293B",
+    padding: "15px",
+    borderRadius: "12px",
+    color: "white",
+  }}
+>
+  <div>🟢 Velocity Vector</div>
+  <div>🔴 Force Vector</div>
+</div>
 </div>
 
       <div
