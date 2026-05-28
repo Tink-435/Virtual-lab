@@ -18,7 +18,8 @@ function App() {
   Composite,
   Mouse,
   MouseConstraint,
-  Constraint
+  Constraint,
+  Events
 } = Matter;
    
 
@@ -65,6 +66,36 @@ function App() {
     render.mouse = mouse;
 
     Render.run(render);
+
+    Events.on(render, "afterRender", () => {
+  const context = render.context;
+
+  Composite.allBodies(engine.world).forEach((body) => {
+    if (body.isStatic) return;
+
+    const velocity = body.velocity;
+
+    const startX = body.position.x;
+    const startY = body.position.y;
+
+    const scale = 25;
+
+    const endX = startX + velocity.x * scale;
+    const endY = startY + velocity.y * scale;
+
+    context.beginPath();
+    context.moveTo(startX, startY);
+    context.lineTo(endX, endY);
+    context.strokeStyle = "#22C55E";
+    context.lineWidth = 2;
+    context.stroke();
+
+    context.beginPath();
+    context.arc(endX, endY, 4, 0, 2 * Math.PI);
+    context.fillStyle = "#22C55E";
+    context.fill();
+  });
+});
 
     const runner = Runner.create();
     Runner.run(runner, engine);
