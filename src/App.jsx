@@ -9,6 +9,13 @@ function App() {
   const engineRef = useRef(null);
   const mouseConstraintRef = useRef(null);
   const previousVelocitiesRef = useRef(new Map());
+  const [metrics, setMetrics] = useState({
+  velocity: 0,
+  acceleration: 0,
+  x: 0,
+  y: 0,
+  objectCount: 0,
+});
 
   useEffect(() => {
    const {
@@ -117,6 +124,23 @@ if (previous) {
   accelY =
     previous.ay * 0.8 + rawAccelY * 0.2;
 }
+
+const velocityMagnitude = Math.sqrt(
+  velocity.x ** 2 + velocity.y ** 2
+);
+
+const accelerationMagnitude = Math.sqrt(
+  accelX ** 2 + accelY ** 2
+);
+
+setMetrics({
+  velocity: velocityMagnitude.toFixed(2),
+  acceleration: accelerationMagnitude.toFixed(2),
+  x: body.position.x.toFixed(1),
+  y: body.position.y.toFixed(1),
+  objectCount: Composite.allBodies(engine.world)
+    .filter((b) => !b.isStatic).length,
+});
 
 previousVelocitiesRef.current.set(body.id, {
   vx: velocity.x,
@@ -461,6 +485,26 @@ const loadPreset = (type) => {
   <div>🟢 Velocity Vector</div>
   <div>🔴 Force Vector</div>
 </div>
+<div
+  style={{
+    position: "absolute",
+    left: "20px",
+    top: "520px",
+    width: "260px",
+    background: "#1E293B",
+    padding: "18px",
+    borderRadius: "12px",
+    color: "white",
+  }}
+>
+  <h3>Live Metrics</h3>
+
+  <div>Velocity: {metrics.velocity} m/s</div>
+  <div>Acceleration: {metrics.acceleration} m/s²</div>
+  <div>X Position: {metrics.x} px</div>
+  <div>Y Position: {metrics.y} px</div>
+  <div>Objects: {metrics.objectCount}</div>
+</div>
 </div>
 
       <div
@@ -479,7 +523,7 @@ const loadPreset = (type) => {
         <button onClick={addCoupledSpring}>Add Coupled Spring</button>
         <button onClick={resetScene}>Reset</button>
         <button onClick={saveExperiment}>Save</button>
-      <button onClick={loadExperiment}>Load</button>
+        <button onClick={loadExperiment}>Load</button>
 
       </div>
       <div
