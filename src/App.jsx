@@ -41,7 +41,7 @@ function App() {
 
     
 
-    const ground = Bodies.rectangle(600, 680, 1200, 40, {
+    const ground = Bodies.rectangle(600, 620, 1200, 40, {
       isStatic: true,
       render: { fillStyle: "#4B5563" },
     });
@@ -169,7 +169,7 @@ context.fill();
   }, [gravity]);
 
   const createGround = () => {
-    return Matter.Bodies.rectangle(600, 680, 1200, 40, {
+    return Matter.Bodies.rectangle(600, 620, 1200, 40, {
       isStatic: true,
       render: { fillStyle: "#4B5563" },
     });
@@ -202,7 +202,7 @@ context.fill();
     {
       density,
       render: {
-        fillStyle: "#10B981",
+        fillStyle: "#96d8c2",
       },
       label: "circle",
     }
@@ -250,7 +250,7 @@ const addCoupledSpring = () => {
   const boxB = Matter.Bodies.rectangle(750, 250, 80, 80, {
     density,
     render: {
-      fillStyle: "#EF4444",
+      fillStyle: "#ebabec",
     },
     label: "coupledSpringB",
   });
@@ -357,6 +357,24 @@ const loadExperiment = () => {
 
   alert("Experiment loaded!");
 };
+
+const loadPreset = (type) => {
+  resetScene();
+
+  if (type === "freefall") {
+    addBox();
+    addCircle();
+  }
+
+  else if (type === "shm") {
+    addSpringPair();
+  }
+
+  else if (type === "coupled") {
+    addCoupledSpring();
+  }
+};
+
   return (
     <div
       style={{
@@ -458,14 +476,37 @@ const loadExperiment = () => {
         <button onClick={addBox}>Add Box</button>
         <button onClick={addCircle}>Add Circle</button>
         <button onClick={addSpringPair}>Add Anchored Spring</button>
-        <button onClick={addCoupledSpring}>
-  Add Coupled Spring
-</button>
+        <button onClick={addCoupledSpring}>Add Coupled Spring</button>
         <button onClick={resetScene}>Reset</button>
         <button onClick={saveExperiment}>Save</button>
       <button onClick={loadExperiment}>Load</button>
 
       </div>
+      <div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "20px",
+    flexWrap: "wrap",
+  }}
+>
+  <button onClick={() => loadPreset("freefall")}>Free Fall</button>
+  <button onClick={() => loadPreset("shm")}>SHM</button>
+  <button onClick={() => loadPreset("coupled")}>Coupled Motion</button>
+</div>
+
+<div
+  style={{
+    textAlign: "center",
+    color: "white",
+    marginBottom: "20px",
+    fontSize: "14px",
+  }}
+>
+  Select a preset experiment to visualize
+  core mechanics concepts
+</div>
       
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div ref={sceneRef}></div>
