@@ -310,76 +310,70 @@ const addCoupledSpring = () => {
   };
 
   const saveExperiment = () => {
-  const world = engineRef.current.world;
+  const bodies = Matter.Composite.allBodies(
+    engineRef.current.world
+  );
 
-  const bodies = Matter.Composite.allBodies(world)
-    .filter(
-      (body) =>
-        !body.isStatic &&
-        body.label !== "Mouse Constraint Body"
-    )
-    .map((body) => ({
+  const experimentData = [];
+
+  bodies.forEach((body) => {
+    if (body.isStatic) return;
+
+    experimentData.push({
+      shape: body.label,
       x: body.position.x,
       y: body.position.y,
-      circleRadius: body.circleRadius || null,
-    }));
+    });
+  });
 
   localStorage.setItem(
     "virtualLabExperiment",
-    JSON.stringify(bodies)
+    JSON.stringify(experimentData)
   );
-
-  alert("Experiment saved!");
 };
 
 const loadExperiment = () => {
-  const saved = localStorage.getItem("virtualLabExperiment");
+  const saved = localStorage.getItem(
+    "virtualLabExperiment"
+  );
 
-  if (!saved) {
-    alert("No saved experiment found.");
-    return;
-  }
+  if (!saved) return;
 
   resetScene();
 
-  const bodies = JSON.parse(saved);
+  const experimentData = JSON.parse(saved);
 
-  bodies.forEach((body) => {
-    if (body.circleRadius) {
-      const circle = Matter.Bodies.circle(
-        body.x,
-        body.y,
-        40,
-        {
-          density,
-          render: { fillStyle: "#10B981" },
-        }
-      );
+  let hasAnchored = false;
+  let hasCoupled = false;
 
-      Matter.Composite.add(
-        engineRef.current.world,
-        circle
-      );
-    } else {
-      const box = Matter.Bodies.rectangle(
-        body.x,
-        body.y,
-        80,
-        80,
-        {
-          density,
-          render: { fillStyle: "#3B82F6" },
-        }
-      );
+  experimentData.forEach((item) => {
+    if (item.shape === "box") {
+      addBox();
+    }
 
-      Matter.Composite.add(
-        engineRef.current.world,
-        box
-      );
+    else if (item.shape === "circle") {
+      addCircle();
+    }
+
+    else if (item.shape === "anchoredSpringBox") {
+      hasAnchored = true;
+    }
+
+    else if (
+      item.shape === "coupledSpringA" ||
+      item.shape === "coupledSpringB"
+    ) {
+      hasCoupled = true;
     }
   });
 
-  alert("Experiment loaded!");
+  if (hasAnchored) {
+    addSpringPair();
+  }
+
+  if (hasCoupled) {
+    addCoupledSpring();
+  }
 };
 
 const loadPreset = (type) => {
