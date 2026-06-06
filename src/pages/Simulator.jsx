@@ -1,0 +1,631 @@
+import { useEffect, useRef, useState } from "react";
+import Matter from "matter-js";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
+} from "recharts";
+
+function App() {
+  const [gravity, setGravity] = useState(0.7);
+  const [springStiffness, setSpringStiffness] = useState(0.005);
+  const [density, setDensity] = useState(0.02);
+  const sceneRef = useRef(null);
+  const engineRef = useRef(null);
+  const mouseConstraintRef = useRef(null);
+  const trackedBodyRef = useRef(null);
+  const previousVelocitiesRef = useRef(new Map());
+  const [metrics, setMetrics] = useState({
+  velocity: 0,
+  acceleration: 0,
+  x: 0,
+  y: 0,
+  objectCount: 0,
+});
+  const [graphData, setGraphData] = useState([]);
+
+  useEffect(() => {
+   const {
+  Engine,
+  Render,
+  Runner,
+  Bodies,
+  Composite,
+  Mouse,
+  MouseConstraint,
+  Constraint,
+  Events
+} = Matter;
+   
+
+    const engine = Engine.create();
+    engine.gravity.y = gravity;
+    engineRef.current = engine;
+
+    const render = Render.create({
+      element: sceneRef.current,
+      engine,
+      options: {
+        width: 1200,
+        height: 700,
+        wireframes: false,
+        background: "#111827",
+      },
+    });
+
+    
+
+    const ground = Bodies.rectangle(600, 620, 1200, 40, {
+      isStatic: true,
+      render: { fillStyle: "#4B5563" },
+    });
+
+    Composite.add(engine.world, ground);
+
+    const mouse = Mouse.create(render.canvas);
+
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse,
+      constraint: {
+        stiffness: 0.15,
+        render: {
+          visible: false,
+        },
+      },
+    });
+
+    mouseConstraintRef.current = mouseConstraint;
+    Matter.Events.on(mouseConstraint, "startdrag", (event) => {
+    trackedBodyRef.current = event.body;
+    }); 
+
+    Composite.add(engine.world, mouseConstraint);
+
+    render.mouse = mouse;
+
+    Render.run(render);
+
+    Events.on(render, "afterRender", () => {
+  const context = render.context;
+
+  Composite.allBodies(engine.world).forEach((body) => {
+    if (body.isStatic) return;
+
+    const velocity = body.velocity;
+
+    const startX = body.position.x;
+    const startY = body.position.y;
+
+    const scale = 25;
+
+    const endX = startX + velocity.x * scale;
+    const endY = startY + velocity.y * scale;
+
+    context.beginPath();
+    context.moveTo(startX-10, startY);
+    context.lineTo(endX-10, endY);
+    context.strokeStyle = "#22C55E";
+    context.lineWidth = 2;
+    context.stroke();
+
+    context.beginPath();
+    context.arc(endX - 10, endY, 4, 0, 2 * Math.PI);
+    context.fillStyle = "#22C55E";
+    context.fill();
+
+   const previous =
+  previousVelocitiesRef.current.get(body.id);
+
+const accelScale = 80;
+
+let accelX = 0;
+let accelY = 0;
+
+if (previous) {
+  const rawAccelX =
+    (velocity.x - previous.vx) * accelScale;
+
+  const rawAccelY =
+    (velocity.y - previous.vy) * accelScale;
+
+  accelX =
+    previous.ax * 0.8 + rawAccelX * 0.2;
+
+  accelY =
+    previous.ay * 0.8 + rawAccelY * 0.2;
+}
+
+const velocityMagnitude = Math.sqrt(
+  velocity.x ** 2 + velocity.y ** 2
+);
+
+const accelerationMagnitude = Math.sqrt(
+  accelX ** 2 + accelY ** 2
+);
+
+if (trackedBodyRef.current === body) {
+  setMetrics({
+    velocity: velocityMagnitude.toFixed(2),
+    acceleration: accelerationMagnitude.toFixed(2),
+    x: body.position.x.toFixed(1),
+    y: body.position.y.toFixed(1),
+    objectCount: Composite.allBodies(engine.world)
+      .filter((b) => !b.isStatic).length,
+  });
+
+  setGraphData((prev) => {
+  const next = [
+    ...prev,
+    {
+      time: prev.length,
+      velocity: Number(
+        velocityMagnitude.toFixed(2)
+      ),
+    },
+  ];
+
+  if (next.length > 25) {
+    next.shift();
+  }
+
+  return next;
+});
+}
+
+previousVelocitiesRef.current.set(body.id, {
+  vx: velocity.x,
+  vy: velocity.y,
+  ax: accelX,
+  ay: accelY,
+});
+
+context.beginPath();
+context.moveTo(startX+10, startY);
+context.lineTo(
+  startX+10 + accelX,
+  startY + accelY
+);
+
+context.strokeStyle = "#EF4444";
+context.lineWidth = 2;
+context.stroke();
+
+context.beginPath();
+context.arc(
+  startX +10 + accelX,
+  startY + accelY,
+  4,
+  0,
+  2 * Math.PI
+);
+
+context.fillStyle = "#EF4444";
+context.fill();
+  });
+});
+
+
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+
+    return () => {
+      Render.stop(render);
+      Runner.stop(runner);
+      Matter.World.clear(engine.world);
+      Matter.Engine.clear(engine);
+      render.canvas.remove();
+    };
+  }, []);
+  useEffect(() => {
+  if (engineRef.current) {
+    engineRef.current.gravity.y = gravity;
+  }
+  }, [gravity]);
+
+  const createGround = () => {
+    return Matter.Bodies.rectangle(600, 620, 1200, 40, {
+      isStatic: true,
+      render: { fillStyle: "#4B5563" },
+    });
+    
+  };
+
+ const addBox = () => {
+  const box = Matter.Bodies.rectangle(
+    Math.random() * 800 + 100,
+    100,
+    80,
+    80,
+    {
+      density,
+      render: {
+        fillStyle: "#3B82F6",
+      },
+      label: "box",
+    }
+  );
+
+  Matter.Composite.add(engineRef.current.world, box);
+  trackedBodyRef.current = box;
+};
+
+ const addCircle = () => {
+  const circle = Matter.Bodies.circle(
+    Math.random() * 800 + 100,
+    100,
+    40,
+    {
+      density,
+      render: {
+        fillStyle: "#96d8c2",
+      },
+      label: "circle",
+    }
+  );
+
+  Matter.Composite.add(engineRef.current.world, circle);
+  trackedBodyRef.current = circle;
+};
+
+  const addSpringPair = () => {
+  const box = Matter.Bodies.rectangle(650, 250, 80, 80, {
+    density,
+    render: {
+      fillStyle: "#F59E0B",
+    },
+    label: "anchoredSpringBox",
+  });
+
+  const spring = Matter.Constraint.create({
+    pointA: { x: 450, y: 150 },
+    bodyB: box,
+    stiffness: springStiffness,
+    damping: 0.05,
+    length: 200,
+    render: {
+      strokeStyle: "#FFFFFF",
+      lineWidth: 3,
+    },
+  });
+
+  Matter.Composite.add(engineRef.current.world, [
+    box,
+    spring,
+  ]);
+  trackedBodyRef.current = box;
+};
+
+const addCoupledSpring = () => {
+  const boxA = Matter.Bodies.rectangle(450, 250, 80, 80, {
+    density,
+    render: {
+      fillStyle: "#3B82F6",
+    },
+    label: "coupledSpringA",
+  });
+
+  const boxB = Matter.Bodies.rectangle(750, 250, 80, 80, {
+    density,
+    render: {
+      fillStyle: "#ebabec",
+    },
+    label: "coupledSpringB",
+  });
+
+  const spring = Matter.Constraint.create({
+    bodyA: boxA,
+    bodyB: boxB,
+    stiffness: springStiffness,
+    damping: 0.05,
+    length: 300,
+    render: {
+      strokeStyle: "#FFFFFF",
+      lineWidth: 3,
+    },
+  });
+
+  Matter.Composite.add(engineRef.current.world, [
+    boxA,
+    boxB,
+    spring,
+  ]);
+  trackedBodyRef.current = boxA;
+};
+
+  const resetScene = () => {
+    const world = engineRef.current.world;
+
+    Matter.Composite.clear(world, false);
+    setGraphData([]);
+
+    Matter.Composite.add(world, [
+      createGround(),
+      mouseConstraintRef.current,
+    ]);
+  };
+
+  const saveExperiment = () => {
+  const bodies = Matter.Composite.allBodies(
+    engineRef.current.world
+  );
+
+  const experimentData = [];
+
+  bodies.forEach((body) => {
+    if (body.isStatic) return;
+
+    experimentData.push({
+      shape: body.label,
+      x: body.position.x,
+      y: body.position.y,
+    });
+  });
+
+  localStorage.setItem(
+    "virtualLabExperiment",
+    JSON.stringify(experimentData)
+  );
+};
+
+const loadExperiment = () => {
+  const saved = localStorage.getItem(
+    "virtualLabExperiment"
+  );
+
+  if (!saved) return;
+
+  resetScene();
+
+  const experimentData = JSON.parse(saved);
+
+  let hasAnchored = false;
+  let hasCoupled = false;
+
+  experimentData.forEach((item) => {
+    if (item.shape === "box") {
+      addBox();
+    }
+
+    else if (item.shape === "circle") {
+      addCircle();
+    }
+
+    else if (item.shape === "anchoredSpringBox") {
+      hasAnchored = true;
+    }
+
+    else if (
+      item.shape === "coupledSpringA" ||
+      item.shape === "coupledSpringB"
+    ) {
+      hasCoupled = true;
+    }
+  });
+
+  if (hasAnchored) {
+    addSpringPair();
+  }
+
+  if (hasCoupled) {
+    addCoupledSpring();
+  }
+};
+
+const loadPreset = (type) => {
+  resetScene();
+
+  if (type === "freefall") {
+    addBox();
+    addCircle();
+  }
+
+  else if (type === "shm") {
+    addSpringPair();
+  }
+
+  else if (type === "coupled") {
+    addCoupledSpring();
+  }
+};
+
+  return (
+    <div
+      style={{
+        background: "#0F172A",
+        minHeight: "100vh",
+        padding: "20px",
+      }}
+    >
+      <h1 style={{ color: "white", textAlign: "center" }}>
+        Virtual-Lab
+      </h1>
+
+      <div
+  style={{
+    position: "absolute",
+    left: "20px",
+    top: "100px",
+    width: "260px",
+    background: "#1E293B",
+    padding: "20px",
+    borderRadius: "12px",
+    color: "white",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.3)"
+  }}
+>
+  <h3 style={{ marginBottom: "20px" }}>
+    Physics Controls
+  </h3>
+
+  <div style={{ marginBottom: "20px" }}>
+    <label>Gravity: {gravity.toFixed(1)}</label>
+    <input
+      type="range"
+      min="0"
+      max="2"
+      step="0.1"
+      value={gravity}
+      onChange={(e) => setGravity(Number(e.target.value))}
+      style={{ width: "100%" }}
+    />
+  </div>
+
+  <div style={{ marginBottom: "20px" }}>
+    <label>
+      Spring Stiffness: {springStiffness.toFixed(3)}
+    </label>
+    <input
+      type="range"
+      min="0.0001"
+      max="0.5"
+      step="0.0005"
+      value={springStiffness}
+      onChange={(e) =>
+        setSpringStiffness(Number(e.target.value))
+      }
+      style={{ width: "100%" }}
+    />
+  </div>
+
+  <div>
+    <label>Density: {density.toFixed(3)}</label>
+    <input
+      type="range"
+      min="0.001"
+      max="0.2"
+      step="0.001"
+      value={density}
+      onChange={(e) => setDensity(Number(e.target.value))}
+      style={{ width: "100%" }}
+    />
+  </div>
+  <div
+  style={{
+    position: "absolute",
+    left: "20px",
+    top: "420px",
+    width: "260px",
+    background: "#1E293B",
+    padding: "15px",
+    borderRadius: "12px",
+    color: "white",
+  }}
+>
+  <div>🟢 Velocity Vector</div>
+  <div>🔴 Force Vector</div>
+</div>
+<div
+  style={{
+    position: "absolute",
+    left: "20px",
+    top: "520px",
+    width: "260px",
+    background: "#1E293B",
+    padding: "18px",
+    borderRadius: "12px",
+    color: "white",
+  }}
+>
+  <h3>Live Metrics</h3>
+  <div>
+  Tracking: {trackedBodyRef.current?.label || "None"}</div>
+  <div>Velocity {metrics.velocity} m/s</div>
+  <div>Acceleration: {metrics.acceleration} m/s²</div>
+  <div>X Position: {metrics.x} px</div>
+  <div>Y Position: {metrics.y} px</div>
+  <div>Objects: {metrics.objectCount}</div>
+</div>
+</div>
+
+<div
+  style={{
+    position: "absolute",
+    left: "20px",
+    top: "760px",
+    width: "380px",
+    background: "#1E293B",
+    padding: "15px",
+    borderRadius: "12px",
+    color: "white",
+  }}
+>
+  <h3>Velocity vs Time</h3>
+
+  <LineChart
+    width={340}
+    height={220}
+    data={graphData}
+  >
+    <CartesianGrid strokeDasharray="3 3" />
+
+    <XAxis dataKey="time" />
+
+    <YAxis />
+
+    <Tooltip />
+
+    <Line
+      type="monotone"
+      dataKey="velocity"
+      stroke="#22C55E"
+      dot={false}
+    />
+  </LineChart>
+</div>
+
+      <div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "20px",
+    flexWrap: "wrap"
+  }}
+>
+  
+        <button onClick={addBox}>Add Box</button>
+        <button onClick={addCircle}>Add Circle</button>
+        <button onClick={addSpringPair}>Add Anchored Spring</button>
+        <button onClick={addCoupledSpring}>Add Coupled Spring</button>
+        <button onClick={resetScene}>Reset</button>
+        <button onClick={saveExperiment}>Save</button>
+        <button onClick={loadExperiment}>Load</button>
+
+      </div>
+      <div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "20px",
+    flexWrap: "wrap",
+  }}
+>
+  <button onClick={() => loadPreset("freefall")}>Free Fall</button>
+  <button onClick={() => loadPreset("shm")}>SHM</button>
+  <button onClick={() => loadPreset("coupled")}>Coupled Motion</button>
+</div>
+
+<div
+  style={{
+    textAlign: "center",
+    color: "white",
+    marginBottom: "20px",
+    fontSize: "14px",
+  }}
+>
+  Select a preset experiment to visualize
+  core mechanics concepts
+</div>
+      
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div ref={sceneRef}></div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
