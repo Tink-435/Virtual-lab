@@ -1,172 +1,190 @@
-# VIRTUAL-LAB 🔬
+# VIRTUAL-LAB ⚛️
 
-> A collaborative real-time 2D physics sandbox for university-level STEM education.
-> Multiple users build, run, and analyse mechanical simulations simultaneously in a shared workspace.
+A real-time collaborative 2D physics sandbox built for university-level STEM education. Multiple users can build, run, and analyse mechanical simulations together in a shared workspace — think Google Docs, but for physics experiments.
 
-[![CI/CD](https://github.com/yourusername/virtual-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/virtual-lab/actions)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-green)]()
-[![Docker](https://img.shields.io/badge/docker-ready-blue)]()
+---
 
-**[Live Demo →](https://virtual-lab.yourdomain.com)** | **[Technical Deep-dive →](./docs/TECHNICAL.md)**
+## The Problem
+
+Teaching physics online is frustrating. Students watch static videos, read equations off a screen, and never actually *feel* how a pendulum behaves differently when you change its mass, or what happens to coupled springs when you crank up the stiffness. The gap between theory and intuition is hard to bridge without hands-on experimentation.
+
+VIRTUAL-LAB tries to fix that by giving instructors and students a shared, live physics canvas where they can build experiments together and watch the math play out in real time.
+
+---
+
+## Demo
+
+> 📹 **[Watch Demo Video](#)**
 
 ---
 
 ## What It Does
 
-| Role | Can Do |
-|------|--------|
-| **Student** | Join rooms via code, add/move physics bodies, run simulations, view live analytics, clone templates, submit assignments |
-| **Instructor** | Create rooms, lock/unlock editing, trigger Chaos Events (gravity flip, shockwave), publish experiment templates, grade student submissions |
-| **Admin** | Full access + user management |
+### For Students
+- Join a live room using a 6-character code from your instructor
+- Add physics bodies (boxes, circles, triangles, hexagons) to the shared canvas
+- Watch velocity and acceleration vectors update in real time on each body
+- See energy conservation graphs — kinetic energy, potential energy, and total energy plotted live
+- Save experiments to your personal library and revisit them later
+- Browse the experiment library and clone templates to explore on your own
+
+### For Instructors
+- Create a room and share the join code with your class
+- Load preset experiments: Free Fall, Simple Harmonic Motion, Coupled Springs, Pendulum, Collision
+- Lock the room so students can only observe while you demonstrate
+- Trigger chaos events that broadcast to every student simultaneously:
+  - **Flip Gravity** — reverses gravitational direction
+  - **Shockwave** — applies an outward impulse from the canvas centre
+  - **Freeze All** — stops every body mid-motion (great for pausing a demo to discuss)
+  - **Zero Gravity** — removes gravity entirely
+  - **Pin Mode** — click any body to anchor it in place
+- Publish experiment templates to the library with instructions and a grading rubric
+- Review and grade student submissions
+
+---
+
+## How Real-Time Sync Works
+
+This was the hardest part to get right. When the instructor drags a body, every student sees it move. When anyone adds a spring pair, it appears on all canvases simultaneously.
+
+Under the hood, every canvas action (add body, load preset, drag, reset) emits a `canvas_action` socket event. The server rebroadcasts it to everyone else in the room, and each client applies the change to their local Matter.js world.
+
+For drag sync specifically, position updates fire on every `mousemove` while dragging. The server skips the database entirely for these and just rebroadcasts instantly — otherwise at 60fps you would be firing thousands of DB queries per second.
+
+---
+
+## Tech Stack
+
+| Layer | Tech | Why |
+|---|---|---|
+| Frontend | React 18 | Component model, hooks for state |
+| Physics | Matter.js | Best 2D rigid body engine for browsers |
+| Real-time | Socket.io | WebSocket with fallback, rooms built-in |
+| Charts | Recharts | React-native, handles streaming data cleanly |
+| Backend | Node.js + Express | Non-blocking I/O, good fit for socket-heavy servers |
+| Database | MongoDB + Mongoose | Flexible schema for physics state JSON |
+| Auth | JWT + bcrypt | Stateless, horizontally scalable |
+| DevOps | Docker + GitHub Actions | One-command setup, automated CI |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLIENT (React)                          │
-│                                                                 │
-│  AuthContext ──► REST API calls (axios)                        │
-│  SocketContext ──► Socket.io (real-time deltas)                │
-│                                                                 │
-│  usePhysics hook                                               │
-│    └── PhysicsWorker (Web Worker thread)                       │
-│          └── Matter.js Engine.update() @ 60fps                 │
-│          └── postMessage(FRAME) → Canvas RAF render loop       │
-│          └── postMessage(ANALYTICS) every 10 ticks             │
-│                                                                 │
-│  useRoomSync hook                                              │
-│    └── Builds OT ops from user interactions                    │
-│    └── socket.emit('physics_op', op)                           │
-│    └── Receives 'op_applied' → applies to Worker               │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │  WebSocket (Socket.io)
-                        │  HTTP (REST)
-┌───────────────────────▼─────────────────────────────────────────┐
-│                        SERVER (Node.js)                         │
-│                                                                 │
-│  Express REST API                                              │
-│    /api/auth        ── JWT register/login                      │
-│    /api/rooms       ── CRUD + state persistence                │
-│    /api/experiments ── save/publish/clone/submit/grade         │
-│    /api/analytics   ── timeseries log queries                  │
-│                                                                 │
-│  Socket.io Manager                                             │
-│    join_room   → send physicsState snapshot                    │
-│    physics_op  → OT Engine → broadcast delta                   │
-│    chaos_event → broadcast to all (instructor only)            │
-│    cursor_move → broadcast (no persistence)                    │
-│                                                                 │
-│  OT Engine (Operational Transformation)                        │
-│    Per-room version counter                                    │
-│    Conflict resolution: same-body → last timestamp wins        │
-│    Different bodies → always independent                       │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │  Mongoose ODM
-┌───────────────────────▼─────────────────────────────────────────┐
-│                        MongoDB                                  │
-│  Users      — bcrypt hashed passwords, RBAC roles              │
-│  Rooms      — physicsState snapshots, stateVersion (OT)        │
-│               analyticsLog (capped timeseries)                 │
-│               TTL index — auto-expires after 24h               │
-│  Experiments — versioned saves, submissions, grades            │
-└─────────────────────────────────────────────────────────────────┘
+Browser (React)
+  │
+  ├── AuthContext     → REST calls via axios (login, register, experiments)
+  ├── SocketContext   → Socket.io connection (one per session)
+  │
+  └── PhysicsCanvas
+        ├── Matter.js engine  → runs physics simulation
+        ├── canvas_action     → emits on every user interaction
+        └── Recharts          → plots KE, PE, velocity live
+
+        ↕  WebSocket
+
+Node.js Server
+  ├── Express REST API
+  │     /api/auth         → JWT register / login
+  │     /api/rooms        → create, join, lock, state persistence
+  │     /api/experiments  → save, publish, clone, submit, grade
+  │
+  └── Socket.io Manager
+        join_room       → sends current room state to new joiner
+        canvas_action   → rebroadcasts to all other users in room
+        chaos_event     → instructor-only, broadcasts to everyone
+        toggle_lock     → locks/unlocks room for students
+
+        ↕  Mongoose ODM
+
+MongoDB
+  ├── Users       → bcrypt passwords, RBAC roles
+  ├── Rooms       → physics state snapshots, participant list, TTL expiry
+  └── Experiments → versioned saves, submissions, grades
 ```
-
----
-
-## Key Engineering Decisions
-
-### 1. Operational Transformation for Physics Sync
-**Problem:** Two users drag the same body simultaneously. Whose position wins?
-
-**Solution:** Server-authoritative OT with vector clocks.
-- Each op carries `{ version, userId, timestamp }`
-- If `op.version === serverVersion` → apply directly (no conflict)
-- If `op.version < serverVersion` → transform against concurrent ops (last timestamp wins for same body)
-- Server broadcasts the *transformed* op to all clients
-- Clients apply ops optimistically for instant feedback; roll back on rejection
-
-**Trade-off discussed:** CRDTs (used by Figma) guarantee convergence without a central server but are more complex. Server-authoritative OT is simpler and correct for physics (which needs a single simulation ground truth anyway).
-
-### 2. Web Worker for Physics Simulation
-**Problem:** Matter.js `Engine.update()` at 60fps blocks the main thread → dropped React renders.
-
-**Solution:** Physics runs in a dedicated Web Worker thread.
-- Worker owns the Matter.js engine entirely
-- Sends `FRAME` messages (body positions) to main thread via `postMessage`
-- Main thread renders positions via `requestAnimationFrame` — never blocked
-- Result: 60fps UI even with 100+ physics bodies
-
-### 3. Delta Broadcasting (not full state)
-Full physicsState for 50 bodies ≈ 5KB. At 60fps with 10 users that's 3MB/s.
-We broadcast only *what changed* (a single body move ≈ 100B → 60KB/s).
-Full state is only sent once on `join_room`.
-
-### 4. MongoDB TTL Index on Rooms
-Rooms auto-expire after 24h via `expiresAt` field + TTL index.
-No cron job needed — MongoDB handles cleanup automatically.
-
-### 5. Experiment Versioning
-Every save appends to `versions[]` array (like Git commits).
-Students can revert to any previous version.
-Instructors see a submission's history, not just the final state.
-
----
-
-## Tech Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Frontend | React 18 + Hooks | Component model, Context for global state |
-| Physics | Matter.js (Web Worker) | Best 2D rigid body engine for browsers |
-| Styling | Tailwind CSS | Utility-first, no CSS file bloat |
-| Charts | Recharts | React-native, responsive, streaming-friendly |
-| Realtime | Socket.io | WebSocket with fallback, rooms built-in |
-| Backend | Node.js + Express | Non-blocking I/O ideal for socket-heavy servers |
-| Database | MongoDB + Mongoose | Flexible schema for physics state JSON |
-| Auth | JWT + bcrypt | Stateless, scales horizontally |
-| Testing | Jest + Supertest | Unit (OT engine) + integration (auth routes) |
-| DevOps | Docker + GitHub Actions | Reproducible builds, automated CI |
 
 ---
 
 ## Running Locally
 
-### Option A: Docker (recommended)
+### Option A — Docker (recommended)
+
+Make sure Docker Desktop is open and running first (look for the whale icon in your menu bar).
+
 ```bash
-git clone https://github.com/yourusername/virtual-lab
+# 1. Clone the repo
+# ⚠️  REPLACE with your actual GitHub repo URL below
+git clone https://github.com/Tink-435/Virtual-lab.git
 cd virtual-lab
-cp backend/.env.example backend/.env   # edit JWT_SECRET
+
+# 2. Set up environment variables
+cp backend/.env.example backend/.env
+# Open backend/.env in any text editor and set JWT_SECRET to any random string
+# Example: JWT_SECRET=myrandombsecretkey123456789
+
+# 3. Start everything
 docker-compose up --build
-# → Frontend: http://localhost:3000
-# → Backend:  http://localhost:5000
-# → MongoDB:  mongodb://localhost:27017
 ```
 
-### Option B: Manual
+Once running:
+- Frontend → http://localhost:3001
+- Backend API → http://localhost:5001
+- Health check → http://localhost:5001/health
+
+To stop: press `Ctrl+C` then run `docker-compose down`
+
+---
+
+### Option B — Manual (no Docker)
+
+You will need Node.js 18+ and MongoDB installed locally.
+
+**Terminal 1 — Start MongoDB**
 ```bash
-# Terminal 1 — MongoDB
 mongod
-
-# Terminal 2 — Backend
-cd backend && cp .env.example .env && npm install && npm run dev
-
-# Terminal 3 — Frontend
-cd frontend && npm install && npm start
 ```
+
+**Terminal 2 — Start Backend**
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+**Terminal 3 — Start Frontend**
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Frontend opens at http://localhost:3000, backend runs at http://localhost:5000.
+
+---
+
+### Testing It End to End
+
+1. Go to `http://localhost:3001`
+2. Register an **Instructor** account
+3. Open an incognito window and register a **Student** account
+4. Instructor: click **Create Room** and copy the 6-character code
+5. Student: paste the code into **Join a Room**
+6. Both users are now live in the same physics canvas
+
+Try loading the **Pendulum** preset on the instructor side — the student should see it appear instantly. Then try **Flip Gravity** from the instructor's chaos panel.
 
 ---
 
 ## Running Tests
+
 ```bash
 cd backend
-npm test              # run all tests
-npm test -- --coverage  # with coverage report
+npm test
+npm test -- --coverage
 ```
 
-Current coverage: **OT Engine 100%**, **Auth routes 95%**
+Tests cover the OT conflict resolution engine (unit tests) and auth routes (integration tests against an in-memory MongoDB instance).
 
 ---
 
@@ -174,53 +192,69 @@ Current coverage: **OT Engine 100%**, **Auth routes 95%**
 
 ```
 virtual-lab/
-├── .github/workflows/ci.yml   ← GitHub Actions CI/CD
-├── docker-compose.yml          ← One-command full stack
+├── .github/workflows/ci.yml      → GitHub Actions CI pipeline
+├── docker-compose.yml             → one-command full stack setup
+│
 ├── backend/
 │   ├── src/
-│   │   ├── server.js           ← Express + Socket.io entry
-│   │   ├── config/db.js        ← MongoDB connection
-│   │   ├── middleware/auth.js  ← JWT protect + RBAC authorize
-│   │   ├── models/             ← User, Room, Experiment (Mongoose)
-│   │   ├── controllers/        ← Business logic
-│   │   ├── routes/             ← Express routers
-│   │   ├── socket/
-│   │   │   ├── socketManager.js ← Socket.io event handlers
-│   │   │   └── otEngine.js      ← OT conflict resolution ⭐
-│   │   └── __tests__/          ← Jest tests
+│   │   ├── server.js              → Express + Socket.io entry point
+│   │   ├── config/db.js           → MongoDB connection
+│   │   ├── middleware/auth.js     → JWT protect + RBAC authorize
+│   │   ├── models/                → User, Room, Experiment schemas
+│   │   ├── controllers/           → business logic
+│   │   ├── routes/                → Express routers
+│   │   └── socket/
+│   │       ├── socketManager.js   → all real-time event handling
+│   │       └── otEngine.js        → conflict resolution engine
 │   └── Dockerfile
+│
 └── frontend/
     ├── src/
-    │   ├── context/            ← AuthContext, SocketContext
-    │   ├── hooks/
-    │   │   ├── usePhysics.js   ← Worker bridge + RAF render ⭐
-    │   │   └── useRoomSync.js  ← OT client + socket events ⭐
-    │   ├── workers/
-    │   │   └── physicsWorker.js ← Matter.js in Web Worker ⭐
+    │   ├── context/
+    │   │   ├── AuthContext.jsx    → global auth state + axios instance
+    │   │   └── SocketContext.jsx  → socket.io connection management
     │   ├── components/
-    │   │   ├── Canvas/         ← PhysicsCanvas, ToolPanel, ChaosPanel
-    │   │   └── Dashboard/      ← AnalyticsDashboard (Recharts)
-    │   └── pages/              ← Dashboard, RoomPage, MyExperiments
+    │   │   ├── Canvas/
+    │   │   │   └── PhysicsCanvas.jsx  → main lab workspace
+    │   │   ├── Auth/AuthPage.jsx
+    │   │   └── Library/ExperimentLibrary.jsx
+    │   └── pages/
+    │       ├── Dashboard.jsx
+    │       ├── RoomPage.jsx
+    │       └── MyExperiments.jsx
     └── Dockerfile
 ```
 
 ---
 
-## What I Learned / Interview Talking Points
+## What I Learned Building This
 
-- **Distributed state synchronisation** — implementing OT from scratch taught me why Figma chose CRDTs and where the tradeoffs lie
-- **Web Workers** — moving CPU-intensive work off the main thread; understanding the structured clone algorithm's limitations (can't transfer DOM references)
-- **JWT security** — localStorage vs httpOnly cookies tradeoff; why `select: false` on passwordHash matters
-- **MongoDB schema design** — embedding vs referencing; TTL indexes; capped arrays (`$slice`)
-- **Socket.io architecture** — rooms, namespaces, auth middleware on handshake
-- **CI/CD** — GitHub Actions with service containers (real MongoDB in CI, not mocks)
+**Real-time sync is harder than it looks.** The trickiest bug in this project was that the Socket.io client connected asynchronously, but the React component was reading `socketRef.current` (which was `null` at render time) instead of waiting for the connection. The fix was switching from a ref to actual React state for the socket instance, so components re-render when the connection is ready.
+
+**Physics engines are opinionated.** Matter.js runs on a fixed timestep and does not care about your React component lifecycle. Learning to separate the simulation loop from the render loop — and not letting them block each other — was a big part of getting smooth 60fps with live analytics at the same time.
+
+**Drag sync needs special handling.** Syncing discrete events like adding a body or loading a preset is straightforward. Syncing continuous mouse drag at 60fps is different — you cannot hit the database on every frame. Skipping the DB lookup for move events and just rebroadcasting them inline made drag feel instant.
 
 ---
 
-## Future Work
+## Known Limitations and Future Work
 
-- [ ] CRDT-based sync (replace OT for true peer-to-peer)
-- [ ] 3D physics mode (Three.js + Cannon.js)
-- [ ] Replay system (record + playback full simulation)
-- [ ] LTI integration (connect to Moodle/Canvas LMS)
-- [ ] Mobile touch support
+- [ ] If two users drag the same body simultaneously, the last update wins — no full conflict resolution for drag events yet
+- [ ] Physics state is not perfectly deterministic across clients — floating point differences can cause tiny divergence over time
+- [ ] No mobile or touch support on the canvas yet
+- [ ] Would love to add a session replay system — record a full experiment and play it back later
+
+---
+
+## Screenshots
+
+> ⚠️  Add your screenshots here. Recommended: one of the login page, one of the canvas with bodies and vectors, one of the analytics panel.
+>
+> To add a screenshot in markdown:
+> ![Description of screenshot](./screenshots/your-image-name.png)
+>
+> Create a /screenshots folder in the root of the project and drop your images there.
+
+---
+
+*Built with Matter.js · Socket.io · React · Node.js · MongoDB*
