@@ -1,0 +1,78 @@
+# ── VIRTUAL-LAB docker-compose ─────────────────────────────────────────────────
+#
+# Spins up 3 services:
+#   mongo    — MongoDB database (persistent volume)
+#   backend  — Express + Socket.io API server
+#   frontend — React app served by nginx
+#
+# Usage:
+#   cp backend/.env.example backend/.env   # fill in your secrets
+#   docker-compose up --build
+#   open http://localhost:3000
+#
+# Why docker-compose for a project?
+#   One command gives any developer the full stack.
+#   No "works on my machine" — everyone runs identical environments.
+#   Shows DevOps maturity in resume reviews.
+
+services:
+
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:6.0
+    container_name: vlab_mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db       # persist data across container restarts
+    environment:
+      MONGO_INITDB_DATABASE: virtual-lab
+    ports:
+      - "27017:27017"             # expose for local GUI tools (Compass, etc.)
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand({ping:1})"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend ────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vlab_backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy   # wait for mongo to be ready
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/virtual-lab   # 'mongo' = service name
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_EXPIRES_IN: 7d
+      CLIENT_URL: http://localhost:3001
+    ports:
+      - "5001:5000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:5001
+    container_name: vlab_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3001:80"
+
+volumes:
+  mongo_data:
+    driver: local

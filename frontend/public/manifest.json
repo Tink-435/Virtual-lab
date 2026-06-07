@@ -1,0 +1,8 @@
+{
+  "short_name": "Virtual Lab",
+  "name": "Virtual Lab Physics Sandbox",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#030712",
+  "background_color": "#030712"
+}
