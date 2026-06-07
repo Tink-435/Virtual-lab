@@ -1,43 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../context/AuthContext';
 import { useAuth } from '../../context/AuthContext';
 
-/**
- * EXPERIMENT LIBRARY
- *
- * Public gallery of published lab templates.
- * Features:
- * - Browse with filter by tags, difficulty, search
- * - Cards showing title, author, description, difficulty badge, likes
- * - Thumbnail (canvas screenshot) preview
- * - Clone → opens in room
- * - Instructor: Publish button (from My Experiments)
- * - Student: Submit assignment
- *
- * This is the "EdTech product" feature that elevates this beyond a toy.
- * Comparable to: Khan Academy exercise library, PhET simulations gallery.
- */
-
-const DIFFICULTY_COLORS = {
-  beginner:     'bg-green-800 text-green-200',
-  intermediate: 'bg-yellow-800 text-yellow-200',
-  advanced:     'bg-red-800 text-red-200',
-};
-
 const TAGS = ['mechanics','pendulum','energy','collision','spring','gravity','orbital','fluid'];
 
-export default function ExperimentLibrary() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [experiments, setExperiments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ difficulty: '', tags: [], search: '' });
-  const [cloning, setCloning] = useState(null);
+const DIFFICULTY = {
+  beginner:     { label:'Beginner',     color:'#34d399', bg:'rgba(52,211,153,0.1)'  },
+  intermediate: { label:'Intermediate', color:'#f59e0b', bg:'rgba(245,158,11,0.1)'  },
+  advanced:     { label:'Advanced',     color:'#f87171', bg:'rgba(248,113,113,0.1)'  },
+};
 
-  useEffect(() => {
-    fetchLibrary();
-  }, [filters]);
+export default function ExperimentLibrary() {
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
+  const [experiments, setExperiments] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [cloning,     setCloning]     = useState(null);
+  const [filters,     setFilters]     = useState({ difficulty:'', tags:[], search:'' });
+
+  useEffect(() => { fetchLibrary(); }, [filters]);
 
   const fetchLibrary = async () => {
     setLoading(true);
@@ -45,15 +27,12 @@ export default function ExperimentLibrary() {
       const params = new URLSearchParams();
       if (filters.difficulty) params.set('difficulty', filters.difficulty);
       if (filters.tags.length) params.set('tags', filters.tags.join(','));
-      if (filters.search) params.set('search', filters.search);
-
+      if (filters.search)     params.set('search', filters.search);
       const res = await api.get(`/experiments/library?${params}`);
       setExperiments(res.data.experiments);
     } catch (err) {
       console.error('Failed to load library:', err);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleClone = async (experimentId, title) => {
@@ -61,7 +40,7 @@ export default function ExperimentLibrary() {
     try {
       await api.post(`/experiments/${experimentId}/clone`, { authorName: user.name });
       if (user.role === 'student') {
-        alert(`Cloned! Ask your instructor to load it in a room, or view it under My Experiments.`);
+        alert('Cloned! View it under My Experiments.');
         navigate('/experiments');
         return;
       }
@@ -69,85 +48,193 @@ export default function ExperimentLibrary() {
       navigate(`/room/${roomRes.data.room.code}`);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to clone experiment');
-    } finally {
-      setCloning(null);
-    }
+    } finally { setCloning(null); }
   };
 
-  const toggleTag = (tag) => {
-    setFilters(f => ({
-      ...f,
-      tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag],
-    }));
-  };
+  const toggleTag = (tag) => setFilters(f => ({
+    ...f,
+    tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag],
+  }));
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <div className="border-b border-gray-800 px-8 py-6">
-        <h1 className="text-2xl font-bold font-mono text-cyan-400">EXPERIMENT LIBRARY</h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Browse and clone pre-configured physics scenarios
-        </p>
-      </div>
+    <div style={{ minHeight:'100vh', background:'#020817', color:'white',
+      fontFamily:'Inter,-apple-system,sans-serif' }}>
 
-      <div className="flex">
-        {/* Filters Sidebar */}
-        <div className="w-56 p-6 border-r border-gray-800 flex-shrink-0">
-          <h3 className="text-xs font-mono text-gray-400 mb-3">DIFFICULTY</h3>
-          {['', 'beginner', 'intermediate', 'advanced'].map(d => (
-            <button
-              key={d}
-              onClick={() => setFilters(f => ({ ...f, difficulty: d }))}
-              className={`block w-full text-left px-2 py-1 rounded text-sm mb-1 transition-colors
-                ${filters.difficulty === d ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              {d || 'All levels'}
-            </button>
-          ))}
-
-          <h3 className="text-xs font-mono text-gray-400 mb-3 mt-5">TAGS</h3>
-          <div className="flex flex-wrap gap-1">
-            {TAGS.map(tag => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className={`px-2 py-0.5 rounded-full text-xs transition-colors
-                  ${filters.tags.includes(tag)
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
+      {/* Nav */}
+      <nav style={{
+        borderBottom:'1px solid rgba(255,255,255,0.06)',
+        padding:'0 32px', height:60,
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        background:'rgba(2,8,23,0.8)', backdropFilter:'blur(20px)',
+        position:'sticky', top:0, zIndex:100,
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Link to="/dashboard" style={{ color:'#64748b', textDecoration:'none', fontSize:20, marginRight:4 }}>←</Link>
+          <div style={{
+            width:32, height:32, borderRadius:8,
+            background:'linear-gradient(135deg,#06b6d4,#8b5cf6)',
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:16,
+          }}>⚛</div>
+          <span style={{
+            fontSize:16, fontWeight:800, letterSpacing:1.5,
+            background:'linear-gradient(90deg,#06b6d4,#8b5cf6)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+          }}>VIRTUAL-LAB</span>
         </div>
+        <div style={{ display:'flex', gap:8 }}>
+          {[{to:'/dashboard',label:'Dashboard'},{to:'/experiments',label:'My Experiments'}].map(n => (
+            <Link key={n.to} to={n.to} style={{
+              color:'#64748b', textDecoration:'none', fontSize:13,
+              fontWeight:500, padding:'6px 14px', borderRadius:8,
+            }}
+              onMouseEnter={e=>{ e.currentTarget.style.color='white'; e.currentTarget.style.background='rgba(255,255,255,0.05)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.color='#64748b'; e.currentTarget.style.background='transparent'; }}
+            >{n.label}</Link>
+          ))}
+        </div>
+      </nav>
 
-        {/* Main Content */}
-        <div className="flex-1 p-6">
-          {/* Search */}
+      {/* Hero */}
+      <div style={{
+        padding:'48px 40px 36px',
+        borderBottom:'1px solid rgba(255,255,255,0.06)',
+        background:'linear-gradient(180deg,rgba(6,182,212,0.04) 0%,transparent 100%)',
+      }}>
+        <h1 style={{
+          margin:'0 0 8px', fontSize:32, fontWeight:800,
+          background:'linear-gradient(90deg,white,#94a3b8)',
+          WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+        }}>Experiment Library</h1>
+        <p style={{ margin:'0 0 28px', color:'#475569', fontSize:15 }}>
+          Browse, clone, and run pre-configured physics scenarios
+        </p>
+
+        {/* Search bar */}
+        <div style={{ position:'relative', maxWidth:520 }}>
+          <span style={{
+            position:'absolute', left:16, top:'50%', transform:'translateY(-50%)',
+            fontSize:16, color:'#475569',
+          }}>🔍</span>
           <input
             type="text"
             placeholder="Search experiments..."
             value={filters.search}
-            onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-sm mb-6
-              focus:outline-none focus:border-cyan-500 text-white placeholder-gray-500"
+            onChange={e => setFilters(f => ({...f, search:e.target.value}))}
+            style={{
+              width:'100%', background:'rgba(255,255,255,0.04)',
+              border:'1px solid rgba(255,255,255,0.08)',
+              borderRadius:12, padding:'12px 16px 12px 44px',
+              color:'white', fontSize:14, outline:'none',
+              boxSizing:'border-box', transition:'border-color 0.2s',
+            }}
+            onFocus={e => e.target.style.borderColor='#06b6d4'}
+            onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.08)'}
           />
+        </div>
+      </div>
+
+      <div style={{ display:'flex' }}>
+
+        {/* Sidebar filters */}
+        <div style={{
+          width:220, padding:'28px 20px',
+          borderRight:'1px solid rgba(255,255,255,0.06)',
+          flexShrink:0, position:'sticky', top:60,
+          height:'calc(100vh - 60px)', overflowY:'auto',
+        }}>
+          <p style={{ margin:'0 0 12px', fontSize:11, fontWeight:700,
+            letterSpacing:1.2, textTransform:'uppercase', color:'#475569' }}>
+            Difficulty
+          </p>
+          {[
+            { val:'',             label:'All Levels', color:'#94a3b8' },
+            { val:'beginner',     label:'Beginner',     color:'#34d399' },
+            { val:'intermediate', label:'Intermediate', color:'#f59e0b' },
+            { val:'advanced',     label:'Advanced',     color:'#f87171' },
+          ].map(d => (
+            <button key={d.val} onClick={() => setFilters(f => ({...f, difficulty:d.val}))} style={{
+              display:'flex', alignItems:'center', gap:10,
+              width:'100%', padding:'9px 12px', borderRadius:10,
+              border:`1px solid ${filters.difficulty===d.val ? d.color+'44' : 'transparent'}`,
+              background: filters.difficulty===d.val ? d.color+'11' : 'transparent',
+              color: filters.difficulty===d.val ? d.color : '#64748b',
+              cursor:'pointer', fontSize:13, fontWeight:500,
+              marginBottom:4, textAlign:'left', transition:'all 0.15s',
+            }}>
+              <span style={{
+                width:8, height:8, borderRadius:'50%',
+                background: filters.difficulty===d.val ? d.color : '#334155',
+                flexShrink:0,
+              }}/>
+              {d.label}
+            </button>
+          ))}
+
+          <p style={{ margin:'24px 0 12px', fontSize:11, fontWeight:700,
+            letterSpacing:1.2, textTransform:'uppercase', color:'#475569' }}>
+            Topics
+          </p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {TAGS.map(tag => {
+              const active = filters.tags.includes(tag);
+              return (
+                <button key={tag} onClick={() => toggleTag(tag)} style={{
+                  padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:500,
+                  border:`1px solid ${active ? '#06b6d4' : 'rgba(255,255,255,0.08)'}`,
+                  background: active ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.02)',
+                  color: active ? '#06b6d4' : '#64748b',
+                  cursor:'pointer', transition:'all 0.15s',
+                }}>{tag}</button>
+              );
+            })}
+          </div>
+
+          {(filters.difficulty || filters.tags.length > 0 || filters.search) && (
+            <button onClick={() => setFilters({ difficulty:'', tags:[], search:'' })} style={{
+              marginTop:24, width:'100%', padding:'8px', borderRadius:10,
+              border:'1px solid rgba(239,68,68,0.2)',
+              background:'rgba(239,68,68,0.06)',
+              color:'#f87171', fontSize:12, fontWeight:600,
+              cursor:'pointer',
+            }}>✕ Clear Filters</button>
+          )}
+        </div>
+
+        {/* Main grid */}
+        <div style={{ flex:1, padding:'28px 32px' }}>
+          {/* Results count */}
+          <p style={{ margin:'0 0 20px', fontSize:13, color:'#475569' }}>
+            {loading ? 'Searching...' : `${experiments.length} experiment${experiments.length !== 1 ? 's' : ''} found`}
+          </p>
 
           {loading ? (
-            <div className="grid grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-48 bg-gray-800 rounded-lg animate-pulse" />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:20 }}>
+              {[...Array(6)].map((_,i) => (
+                <div key={i} style={{
+                  height:260, borderRadius:16,
+                  background:'rgba(255,255,255,0.02)',
+                  border:'1px solid rgba(255,255,255,0.05)',
+                  animation:'pulse 1.5s infinite',
+                }}/>
               ))}
             </div>
           ) : experiments.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              <p className="text-4xl mb-3">🔬</p>
-              <p>No experiments found. Be the first to publish one!</p>
+            <div style={{
+              textAlign:'center', padding:'80px 24px',
+              background:'rgba(255,255,255,0.01)',
+              border:'1px dashed rgba(255,255,255,0.06)',
+              borderRadius:20,
+            }}>
+              <div style={{ fontSize:56, marginBottom:20 }}>🔬</div>
+              <p style={{ color:'#475569', fontSize:16, margin:'0 0 8px', fontWeight:600 }}>
+                No experiments found
+              </p>
+              <p style={{ color:'#334155', fontSize:13, margin:0 }}>
+                Try adjusting your filters, or be the first to publish one!
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:20 }}>
               {experiments.map(exp => (
                 <ExperimentCard
                   key={exp._id}
@@ -165,54 +252,106 @@ export default function ExperimentLibrary() {
 }
 
 function ExperimentCard({ experiment, onClone, cloning }) {
+  const [hovered, setHovered] = useState(false);
+  const diff = DIFFICULTY[experiment.difficulty];
+
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden
-      hover:border-gray-600 transition-colors group">
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+        border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
+        borderRadius:16, overflow:'hidden',
+        transition:'all 0.2s', cursor:'default',
+        display:'flex', flexDirection:'column',
+      }}
+    >
       {/* Thumbnail */}
-      <div className="h-32 bg-gray-800 relative overflow-hidden">
+      <div style={{
+        height:140, background:'linear-gradient(135deg,#0f172a,#1e293b)',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        position:'relative', overflow:'hidden',
+      }}>
         {experiment.thumbnail ? (
-          <img
-            src={experiment.thumbnail}
-            alt={experiment.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+          <img src={experiment.thumbnail} alt={experiment.title}
+            style={{ width:'100%', height:'100%', objectFit:'cover',
+              transform: hovered ? 'scale(1.05)' : 'scale(1)', transition:'transform 0.3s' }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl text-gray-700">
-            ⚛
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:48, opacity:0.2 }}>⚛</div>
           </div>
         )}
-        <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium
-          ${DIFFICULTY_COLORS[experiment.difficulty] || 'bg-gray-700 text-gray-300'}`}>
-          {experiment.difficulty}
-        </span>
+        {diff && (
+          <span style={{
+            position:'absolute', top:12, right:12,
+            fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:20,
+            color: diff.color, background: diff.bg,
+            backdropFilter:'blur(8px)',
+          }}>{diff.label}</span>
+        )}
+        {/* Hover overlay */}
+        {hovered && (
+          <div style={{
+            position:'absolute', inset:0,
+            background:'rgba(6,182,212,0.06)',
+            transition:'opacity 0.2s',
+          }}/>
+        )}
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        <h3 className="font-semibold text-white text-sm mb-1 truncate">{experiment.title}</h3>
-        <p className="text-gray-400 text-xs mb-2 line-clamp-2">{experiment.description}</p>
+      <div style={{ padding:'18px 20px', flex:1, display:'flex', flexDirection:'column' }}>
+        <h3 style={{ margin:'0 0 6px', fontSize:15, fontWeight:700,
+          color:'white', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+          {experiment.title}
+        </h3>
+        <p style={{ margin:'0 0 12px', fontSize:12, color:'#64748b',
+          lineHeight:1.5, display:'-webkit-box', WebkitLineClamp:2,
+          WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+          {experiment.description || 'No description'}
+        </p>
 
-        <div className="flex flex-wrap gap-1 mb-3">
-          {experiment.tags?.slice(0, 3).map(tag => (
-            <span key={tag} className="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">by {experiment.authorName}</span>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">♥ {experiment.likes}</span>
-            <button
-              onClick={onClone}
-              disabled={cloning}
-              className="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50
-                rounded text-xs font-medium text-white transition-colors"
-            >
-              {cloning ? '...' : '↗ Clone'}
-            </button>
+        {/* Tags */}
+        {experiment.tags?.length > 0 && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:14 }}>
+            {experiment.tags.slice(0,3).map(tag => (
+              <span key={tag} style={{
+                fontSize:11, padding:'3px 9px', borderRadius:20,
+                background:'rgba(255,255,255,0.04)',
+                border:'1px solid rgba(255,255,255,0.08)',
+                color:'#64748b',
+              }}>{tag}</span>
+            ))}
           </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'auto' }}>
+          <div>
+            <p style={{ margin:0, fontSize:11, color:'#475569' }}>
+              by {experiment.authorName || 'Unknown'}
+            </p>
+            <p style={{ margin:'2px 0 0', fontSize:11, color:'#334155' }}>
+              ♥ {experiment.likes || 0} likes
+            </p>
+          </div>
+          <button onClick={onClone} disabled={cloning} style={{
+            padding:'8px 18px', borderRadius:10, border:'none',
+            background: cloning
+              ? 'rgba(255,255,255,0.05)'
+              : 'linear-gradient(135deg,#0e7490,#6d28d9)',
+            color: cloning ? '#64748b' : 'white',
+            fontSize:12, fontWeight:700,
+            cursor: cloning ? 'not-allowed' : 'pointer',
+            transition:'opacity 0.15s',
+          }}
+            onMouseEnter={e => { if (!cloning) e.currentTarget.style.opacity='0.85'; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity='1'; }}
+          >
+            {cloning ? 'Cloning...' : '↗ Clone'}
+          </button>
         </div>
       </div>
     </div>

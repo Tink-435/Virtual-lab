@@ -1,3 +1,4 @@
+let _socketInstance = null;
 import { useEffect, useRef, useState, useCallback } from "react";
 import Matter from "matter-js";
 import { useNavigate } from "react-router-dom";
@@ -100,7 +101,10 @@ export default function PhysicsCanvas({ room }) {
   const socketRef     = useRef(socket);
 
   // keep refs in sync with state
-  useEffect(() => { socketRef.current = socket; }, [socket]);
+  useEffect(() => {
+  socketRef.current = socket;
+  _socketInstance = socket;
+}, [socket]);
   useEffect(() => { isPinModeRef.current     = isPinMode; },       [isPinMode]);
   useEffect(() => { densityRef.current       = density; },         [density]);
   useEffect(() => { restitutionRef.current   = restitution; },     [restitution]);
@@ -150,7 +154,7 @@ Events.on(mc, "enddrag", e => {
 Events.on(mc, "mousemove", e => {
   if (!isDraggingRef.current || !trackedBodyRef.current) return;
   const b = trackedBodyRef.current;
-  socketRef.current?.emit("canvas_action", {
+  _socketInstance?.emit("canvas_action", {
     action: "move_body",
     data: {
       label: b.label,
@@ -267,29 +271,33 @@ Events.on(mc, "mousemove", e => {
   ];
 
   // ── Core body adders (also called when receiving canvas_action from others) ─
-  const _addBox = useCallback(() => {
-    const b = Matter.Bodies.rectangle(Math.random()*600+180, 80, 80, 80, makeOpts("box"));
-    Matter.Composite.add(engineRef.current.world, b);
-    trackedBodyRef.current = b;
-  }, []);
+  const _addBox = useCallback((x, y) => {
+  const px = x ?? Math.random()*600+180;
+  const b = Matter.Bodies.rectangle(px, y ?? 80, 80, 80, makeOpts("box"));
+  Matter.Composite.add(engineRef.current.world, b);
+  trackedBodyRef.current = b;
+}, []);
 
-  const _addCircle = useCallback(() => {
-    const b = Matter.Bodies.circle(Math.random()*600+180, 80, 40, makeOpts("circle"));
-    Matter.Composite.add(engineRef.current.world, b);
-    trackedBodyRef.current = b;
-  }, []);
+  const _addCircle = useCallback((x, y) => {
+  const px = x ?? Math.random()*600+180;
+  const b = Matter.Bodies.circle(px, y ?? 80, 40, makeOpts("circle"));
+  Matter.Composite.add(engineRef.current.world, b);
+  trackedBodyRef.current = b;
+}, []);
 
-  const _addTriangle = useCallback(() => {
-    const b = Matter.Bodies.polygon(Math.random()*600+180, 80, 3, 50, makeOpts("triangle"));
-    Matter.Composite.add(engineRef.current.world, b);
-    trackedBodyRef.current = b;
-  }, []);
+  const _addTriangle = useCallback((x, y) => {
+  const px = x ?? Math.random()*600+180;
+  const b = Matter.Bodies.polygon(px, y ?? 80, 3, 50, makeOpts("triangle"));
+  Matter.Composite.add(engineRef.current.world, b);
+  trackedBodyRef.current = b;
+}, []);
 
-  const _addHexagon = useCallback(() => {
-    const b = Matter.Bodies.polygon(Math.random()*600+180, 80, 6, 45, makeOpts("hexagon"));
-    Matter.Composite.add(engineRef.current.world, b);
-    trackedBodyRef.current = b;
-  }, []);
+  const _addHexagon = useCallback((x, y) => {
+  const px = x ?? Math.random()*600+180;
+  const b = Matter.Bodies.polygon(px, y ?? 80, 6, 45, makeOpts("hexagon"));
+  Matter.Composite.add(engineRef.current.world, b);
+  trackedBodyRef.current = b;
+}, []);
 
   const _addSpringPair = useCallback(() => {
     const box = Matter.Bodies.rectangle(480, 200, 80, 80, makeOpts("anchoredSpring"));
@@ -354,10 +362,30 @@ Events.on(mc, "mousemove", e => {
   }, [socket]);
 
   // Public versions: apply locally + emit to others
-  const addBox      = () => { if (!canEdit) return; _addBox();          emitCanvasAction("add_body", { type:"box" }); };
-  const addCircle   = () => { if (!canEdit) return; _addCircle();       emitCanvasAction("add_body", { type:"circle" }); };
-  const addTriangle = () => { if (!canEdit) return; _addTriangle();     emitCanvasAction("add_body", { type:"triangle" }); };
-  const addHexagon  = () => { if (!canEdit) return; _addHexagon();      emitCanvasAction("add_body", { type:"hexagon" }); };
+  const addBox = () => {
+  if (!canEdit) return;
+  const x = Math.random()*600+180;
+  _addBox(x, 80);
+  emitCanvasAction("add_body", { type:"box", x, y:80 });
+};
+  const addCircle = () => {
+  if (!canEdit) return;
+  const x = Math.random()*600+180;
+  _addCircle(x, 80);
+  emitCanvasAction("add_body", { type:"circle", x, y:80 });
+};
+  const addTriangle = () => {
+  if (!canEdit) return;
+  const x = Math.random()*600+180;
+  _addTriangle(x, 80);
+  emitCanvasAction("add_body", { type:"triangle", x, y:80 });
+};
+  const addHexagon = () => {
+  if (!canEdit) return;
+  const x = Math.random()*600+180;
+  _addHexagon(x, 80);
+  emitCanvasAction("add_body", { type:"hexagon", x, y:80 });
+};
   const addSpringPair = () => {
   if (!canEdit) return;
   _addSpringPair();
@@ -413,10 +441,10 @@ Events.on(mc, "mousemove", e => {
         _loadPreset(data.preset);
       } else if (action === "add_body") {
         setSyncMsg(`${label} added a ${data.type}`);
-        if (data.type === "box")            _addBox();
-        else if (data.type === "circle")    _addCircle();
-        else if (data.type === "triangle")  _addTriangle();
-        else if (data.type === "hexagon")   _addHexagon();
+        if (data.type === "box")            _addBox(data.x, data.y);
+        else if (data.type === "circle")    _addCircle(data.x, data.y);
+        else if (data.type === "triangle")  _addTriangle(data.x, data.y);
+        else if (data.type === "hexagon")   _addHexagon(data.x, data.y);    
         else if (data.type === "spring_pair")    _addSpringPair();
         else if (data.type === "coupled_spring") _addCoupledSpring();
         else if (data.type === "pendulum")       _addPendulum();
