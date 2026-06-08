@@ -21,7 +21,8 @@ const mongoose = require('mongoose');
 
 const bodySchema = new mongoose.Schema({
   id: String,           // Matter.js body ID
-  type: String,         // 'circle', 'rectangle', 'polygon'
+  type: String,   
+  shape: String,       // 'circle', 'rectangle', 'polygon'
   x: Number,
   y: Number,
   angle: Number,
@@ -62,7 +63,7 @@ const roomSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
     // Role of owner in the room context
-    ownerRole: { type: String, enum: ['instructor', 'admin'], default: 'instructor' },
+    ownerRole: { type: String, enum: ['student', 'instructor', 'admin'], default: 'instructor' },
 
     isLocked: { type: Boolean, default: false }, // instructor can freeze the room
 

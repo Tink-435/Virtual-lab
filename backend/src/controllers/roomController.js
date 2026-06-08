@@ -36,12 +36,23 @@ exports.createRoom = async (req, res) => {
 
     // If cloning from a template, copy its physicsState
     if (templateId) {
-      const Experiment = require('../models/Experiment');
-      const template = await Experiment.findById(templateId);
-      if (template) {
-        initialPhysicsState = template.physicsState;
-      }
-    }
+  const Experiment = require('../models/Experiment');
+  const template = await Experiment.findById(templateId);
+  console.log(
+  "TEMPLATE PHYSICS STATE:",
+  JSON.stringify(template.physicsState, null, 2)
+);
+  if (template && template.physicsState) {
+    initialPhysicsState = {
+      bodies: template.physicsState.bodies || [],
+      constraints: template.physicsState.constraints || [],
+      gravity: template.physicsState.gravity || { x: 0, y: 1 },
+      worldWidth: template.physicsState.worldWidth || 1600,
+      worldHeight: template.physicsState.worldHeight || 900,
+      isRunning: false,
+    };
+  }
+}
 
     const room = await Room.create({
       name,

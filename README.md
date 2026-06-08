@@ -1,8 +1,8 @@
-# VIRTUAL-LAB ⚛️
+# VIRTUAL-LAB 
 
-> A real-time collaborative 2D physics sandbox built for university-level STEM education.
-> Multiple users build, run, and analyse mechanical simulations together in a shared workspace —
-> think Google Docs, but for physics experiments.
+A real-time collaborative 2D physics sandbox built for university-level STEM education.
+Multiple users build, run, and analyse mechanical simulations together in a shared workspace —
+think Google Docs, but for physics experiments.
 
 [![CI/CD](https://github.com/eshikakatekhaye/virtual-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/eshikakatekhaye/virtual-lab/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

@@ -44,7 +44,7 @@ export default function MyExperiments() {
   const [submissions,  setSubmissions]  = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [publishModal, setPublishModal] = useState(null);
-  const [publishForm,  setPublishForm]  = useState({ instructions:'', rubric:'', isPublic:false });
+  const [publishForm,  setPublishForm]  = useState({ instructions:'', rubric:'', isPublic:true });
   const [publishing,   setPublishing]   = useState(false);
 
   useEffect(() => {
@@ -211,15 +211,34 @@ export default function MyExperiments() {
                 </div>
                 <div style={{ display:'flex', gap:10, flexShrink:0, marginLeft:24 }}>
                   <ActionBtn
-                    onClick={() => navigate(`/room/new?experimentId=${selected._id}`)}
+                    onClick={async () => {
+  try {
+    const roomRes = await api.post('/rooms', {
+      name: selected.title,
+      templateId: selected._id,
+    });
+    navigate(`/room/${roomRes.data.room.code}`);
+  } catch (err) {
+    alert('Failed to open experiment');
+  }
+}}
                     color="#06b6d4"
                   >Open in Lab →</ActionBtn>
-                  {user.role === 'instructor' && !selected.isPublished && (
-                    <ActionBtn
-                      onClick={() => setPublishModal(selected)}
-                      color="#f59e0b"
-                    >Publish as Template</ActionBtn>
-                  )}
+                {user.role === 'instructor' && !selected.isPublished && (
+  <ActionBtn
+    onClick={() => {
+      setPublishModal(selected);
+      setPublishForm({
+        instructions: '',
+        rubric: '',
+        isPublic: true,
+      });
+    }}
+    color="#f59e0b"
+  >
+    Publish Template
+  </ActionBtn>
+)}
                 </div>
               </div>
 

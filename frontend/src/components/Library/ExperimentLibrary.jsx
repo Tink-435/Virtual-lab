@@ -36,20 +36,27 @@ export default function ExperimentLibrary() {
   };
 
   const handleClone = async (experimentId, title) => {
-    setCloning(experimentId);
-    try {
-      await api.post(`/experiments/${experimentId}/clone`, { authorName: user.name });
-      if (user.role === 'student') {
-        alert('Cloned! View it under My Experiments.');
-        navigate('/experiments');
-        return;
-      }
-      const roomRes = await api.post('/rooms', { name: title, templateId: experimentId });
+  setCloning(experimentId);
+  try {
+    if (user.role === 'student') {
+      // Student: create a personal room linked to this template
+      // so the canvas knows to show "Submit Assignment" instead of "Save"
+      const roomRes = await api.post('/rooms', {
+        name: `${title} — ${user.name}`,
+        templateId: experimentId,
+      });
       navigate(`/room/${roomRes.data.room.code}`);
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to clone experiment');
-    } finally { setCloning(null); }
-  };
+      return;
+    }
+
+    // Instructor: clone and open in a new room
+    await api.post(`/experiments/${experimentId}/clone`, { authorName: user.name });
+    const roomRes = await api.post('/rooms', { name: title, templateId: experimentId });
+    navigate(`/room/${roomRes.data.room.code}`);
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to open experiment');
+  } finally { setCloning(null); }
+};
 
   const toggleTag = (tag) => setFilters(f => ({
     ...f,
@@ -235,14 +242,15 @@ export default function ExperimentLibrary() {
             </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:20 }}>
-              {experiments.map(exp => (
-                <ExperimentCard
-                  key={exp._id}
-                  experiment={exp}
-                  onClone={() => handleClone(exp._id, exp.title)}
-                  cloning={cloning === exp._id}
-                />
-              ))}
+             {experiments.map(exp => (
+  <ExperimentCard
+    key={exp._id}
+    experiment={exp}
+    onClone={() => handleClone(exp._id, exp.title)}
+    cloning={cloning === exp._id}
+    userRole={user?.role}
+  />
+))}
             </div>
           )}
         </div>
@@ -251,7 +259,7 @@ export default function ExperimentLibrary() {
   );
 }
 
-function ExperimentCard({ experiment, onClone, cloning }) {
+function ExperimentCard({ experiment, onClone, cloning, userRole }) {
   const [hovered, setHovered] = useState(false);
   const diff = DIFFICULTY[experiment.difficulty];
 
@@ -350,7 +358,7 @@ function ExperimentCard({ experiment, onClone, cloning }) {
             onMouseEnter={e => { if (!cloning) e.currentTarget.style.opacity='0.85'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity='1'; }}
           >
-            {cloning ? 'Cloning...' : '↗ Clone'}
+            {cloning ? 'Opening...' : userRole === 'student' ? '📝 Start Assignment' : '↗ Clone'}
           </button>
         </div>
       </div>

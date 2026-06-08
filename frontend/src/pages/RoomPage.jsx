@@ -30,7 +30,9 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('room_joined', ({ room: r }) => setRoom(prev => prev ? {...prev,...r} : r));
+    socket.on('room_joined', ({ room: r }) => {
+  setRoom(prev => prev ? { ...prev, ...r, templateId: r.templateId || prev?.templateId } : r);
+});
     socket.on('error', ({ message }) => setError(message));
     return () => { socket.off('room_joined'); socket.off('error'); };
   }, [socket]);
@@ -76,5 +78,5 @@ export default function RoomPage() {
     </div>
   );
 
-  return <PhysicsCanvas room={room} />;
+  return <PhysicsCanvas room={room} key={room._id} />;
 }

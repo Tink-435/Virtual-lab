@@ -134,6 +134,34 @@ export default function PhysicsCanvas({ room }) {
     const wallR  = Bodies.rectangle(970,280,20,560, { isStatic:true, label:"__wallR__",  render:{ fillStyle:"#334155" } });
     Composite.add(engine.world, [ground, wallL, wallR]);
 
+console.log("ROOM:", room);
+console.log("PHYSICS STATE:", room?.physicsState);
+console.log("BODIES:", room?.physicsState?.bodies);
+
+    // Restore saved bodies from room physicsState
+if (room?.physicsState?.bodies?.length > 0) {
+  console.log("RESTORE BLOCK RUNNING");
+  room.physicsState.bodies.forEach(b => {
+    if (!b.shape || b.shape.startsWith('__')) return;
+    const opts = {
+      density: 0.02, restitution: 0.6, friction: 0.1,
+      label: b.shape,
+      render: { fillStyle: nextColor() },
+    };
+    let body;
+    if (b.shape === 'box' || b.shape === 'anchoredSpring' || b.shape === 'coupledA' || b.shape === 'coupledB') {
+      body = Bodies.rectangle(b.x, b.y, 80, 80, opts);
+    } else if (b.shape === 'circle' || b.shape === 'pendulum') {
+      body = Bodies.circle(b.x, b.y, 40, opts);
+    } else if (b.shape === 'triangle') {
+      body = Bodies.polygon(b.x, b.y, 3, 50, opts);
+    } else if (b.shape === 'hexagon') {
+      body = Bodies.polygon(b.x, b.y, 6, 45, opts);
+    }
+    if (body) Composite.add(engine.world, body);
+  });
+}
+
     const mouse = Mouse.create(render.canvas);
     const mc = MouseConstraint.create(engine, {
       mouse, constraint:{ stiffness:0.15, render:{ visible:false } },
@@ -510,24 +538,47 @@ Events.on(mc, "mousemove", e => {
 
   // ── Save to backend ────────────────────────────────────────────────────────
   const saveExperiment = async () => {
-    const bodies = Matter.Composite.allBodies(engineRef.current.world)
-      .filter(b => !b.isStatic)
-      .map(b => ({ shape:b.label, x:b.position.x, y:b.position.y }));
-    try {
-      setSaveStatus("Saving...");
+    console.log(
+    "All body labels:",
+    Matter.Composite.allBodies(engineRef.current.world)
+      .map(b => b.label)
+  );
+  const bodies = Matter.Composite.allBodies(engineRef.current.world)
+    .filter(b => !b.isStatic)
+    .map(b => ({ shape:b.label, x:b.position.x, y:b.position.y }));
+
+  console.log("Saving:", bodies);
+
+  // Check if this room was loaded from a template
+  const templateId = room?.templateId;
+
+  try {
+    setSaveStatus("Saving...");
+
+    if (templateId && isStudent) {
+      // Student submitting against a template
+      await api.post(`/experiments/${templateId}/submit`, {
+        physicsState: { bodies },
+        studentName: user?.name,
+        analyticsSnapshot: metrics,
+      });
+      setSaveStatus("✓ Submitted!");
+    } else {
+      // Regular save to personal library
       await api.post("/experiments", {
         title: `${room?.name||"Lab"} — ${new Date().toLocaleTimeString()}`,
         description: `Saved from room ${room?.code}`,
         physicsState: { bodies },
         authorName: user?.name,
       });
-      setSaveStatus("Saved to library!");
-    } catch {
-      localStorage.setItem("virtualLabExperiment", JSON.stringify(bodies));
-      setSaveStatus("Saved locally");
+      setSaveStatus("✓ Saved to library!");
     }
-    setTimeout(() => setSaveStatus(""), 2500);
-  };
+  } catch {
+    localStorage.setItem("virtualLabExperiment", JSON.stringify(bodies));
+    setSaveStatus("Saved locally");
+  }
+  setTimeout(() => setSaveStatus(""), 2500);
+};
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -697,9 +748,9 @@ Events.on(mc, "mousemove", e => {
           <Panel>
             <SectionTitle>Scene</SectionTitle>
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              <Btn onClick={saveExperiment} color="#065F46">
-                {saveStatus || "💾 Save to Library"}
-              </Btn>
+              <Btn onClick={saveExperiment} color={room?.templateId && isStudent ? "#7C3AED" : "#065F46"}>
+  {saveStatus || (room?.templateId && isStudent ? "📤 Submit Assignment" : "💾 Save to Library")}
+</Btn>
               <Btn onClick={resetScene} color="#7F1D1D" disabled={!canEdit}>↺ Reset</Btn>
             </div>
           </Panel>

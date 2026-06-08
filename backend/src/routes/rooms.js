@@ -10,7 +10,7 @@ const router = express.Router();
 // All room routes require login
 router.use(protect);
 
-router.post('/', authorize('instructor', 'admin'), createRoom);
+router.post('/', createRoom);
 router.get('/mine', getMyRooms);
 router.get('/:code', getRoomByCode);
 router.patch('/:id/lock', authorize('instructor', 'admin'), toggleLock);
